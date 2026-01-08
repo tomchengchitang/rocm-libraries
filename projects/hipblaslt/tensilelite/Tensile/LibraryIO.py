@@ -27,10 +27,10 @@ from . import SolutionLibrary
 from .CustomYamlLoader import load_yaml_stream
 from Tensile import __version__
 from Tensile.Common import printExit, printWarning, print2, \
-                           versionIsCompatible, IsaInfo
+                           versionIsCompatible, IsaInfo, DataType
 from Tensile.Common.Architectures import gfxToIsa
 from Tensile.SolutionStructs import Solution, ProblemSizes
-from Tensile.SolutionStructs.Problem import ProblemType, problemTypeToEnum
+from Tensile.SolutionStructs.Problem import ProblemType, problemTypeToEnum, getRealDataTypeA, getRealDataTypeB
 
 from typing import NamedTuple, List, Dict
 import os
@@ -247,7 +247,6 @@ def parseSolutionsData(
     problemSizes = ProblemSizes(problemType, problemSizesConfig)
     return (problemSizes, solutions)
 
-
 class LibraryLogic(NamedTuple):
     """Return tuple for parseLibraryLogicData()"""
     schedule: str
@@ -295,6 +294,22 @@ def parseLibraryLogicData(
 
     if "CUCount" not in data:
         data["CUCount"] = None
+
+    if 'MacDataTypeA' not in data["ProblemType"]: #it will either be set as d['MacDataType'] or a specified input
+        data["ProblemType"]['MacDataTypeA'] = getRealDataTypeA(data["ProblemType"]['DataType'])
+
+    if 'MacDataTypeB' not in data["ProblemType"]:
+        data["ProblemType"]['MacDataTypeB'] = getRealDataTypeB(data["ProblemType"]['DataType'])
+
+    if 'DataTypeA' not in data["ProblemType"]:
+        data["ProblemType"]['DataTypeA'] = data["ProblemType"]['MacDataTypeA']
+    else:
+        data["ProblemType"]['DataTypeA'] = getRealDataTypeA(data["ProblemType"]['DataTypeA'])
+
+    if 'DataTypeB' not in data["ProblemType"]:
+        data["ProblemType"]['DataTypeB'] = data["ProblemType"]['MacDataTypeB']
+    else:
+        data["ProblemType"]['DataTypeB'] = getRealDataTypeB(data["ProblemType"]['DataTypeB'])
 
     if not versionIsCompatible(data["MinimumRequiredVersion"]):
         printWarning("Version = {} in library logic file {} does not match Tensile version = {}" \

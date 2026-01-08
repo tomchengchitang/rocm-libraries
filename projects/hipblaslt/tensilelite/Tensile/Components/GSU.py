@@ -154,9 +154,9 @@ class GSUOff(GSU):
         stride = writer.strideRef(tc, dimIdx)
         isMirrorIdx = dimIdx in kernel["ProblemType"]["MirrorDims%s"%tc]
 
-        m = "DepthU*Bpe%s"%(tcGR)
+        m = kernel["_DepthU%s" % tc] * tP["bpeGR"]
         if isMirrorIdx:
-          m = "-%s"%(m)
+          m = "-%d"%(m)
 
         if writer.states.globalReadIncsUseVgpr:
             with writer.allocTmpSgpr(2) as tmpSgprInfo:
@@ -296,30 +296,19 @@ class GSUOn(GSU):
 
         tc = tP["tensorChar"]
         depthU = kernel["DepthU"]
-        depthUDiv = kernel["DepthU"]
+        _DepthU = kernel["_DepthU%s" % tc]
         # swizzle
         if (tP["isSwizzled"] and tc == 'A'):
-            depthUDiv = "%s%s"%(kernel["DepthU"], "*MI_M")
+            _DepthU = (_DepthU * 16) # MI_M = 16
         elif (tP["isSwizzled"] and tc == 'B'):
-            depthUDiv = "%s%s"%(kernel["DepthU"], "*MI_N")
+             _DepthU = (_DepthU * 16) # MI_N = 16
 
-        gsuOffsetStr = "gsuOffset = DepthU*bpeGR*GSUSumIdx"
-        divider = 1
-        if kernel["ProblemType"]["Sparse"]:
-            if (kernel["ProblemType"]["Sparse"] == 2 and tP["isB"]) or \
-                (kernel["ProblemType"]["Sparse"] == 1 and tP["isA"]) :
-                divider = 2
-            elif tP["isM"]:
-                divider = 8
-            if divider != 1:
-                depthUDiv = depthU // divider
-                gsuOffsetStr = "gsuOffset = DepthU/%s*bpeGR*GSUSumIdx"%(divider)
         gsucLabel    = Label(label=writer.labels.getNameInc("GSUC_A" if tP["isA"] else "GSUC_B"), comment="")
         gsucLabelEnd = Label(label=writer.labels.getNameInc("GSUC_A_End" if tP["isA"] else "GSUC_B_End"), comment="")
         module.add(SAndB32(dst=sgpr(stmp), src0=sgpr("GSU"), src1=hex(0x8000), comment="SCC = (GSUC == 1) ?"))
         module.add(SCBranchSCC1(labelName=gsucLabel.getLabelName(), comment="branch if GSUC == 1"))
         gsuOffsetStr = "gsuOffset = DepthU*GSUSumIdx"
-        module.addModuleAsFlatItems(writer.s_mul_u64_u32(sgpr(stmp+0), sgpr(stmp+1), depthUDiv, sgpr("GSUSumIdx"), comment=gsuOffsetStr))
+        module.addModuleAsFlatItems(writer.s_mul_u64_u32(sgpr(stmp+0), sgpr(stmp+1), _DepthU, sgpr("GSUSumIdx"), comment=gsuOffsetStr))
         module.add(SBranch(gsucLabelEnd.getLabelName()))
         module.add(gsucLabel)
         gsuOffsetStr = "gsuOffset = DepthU*accumulatedNumOfLoopCounterL"
@@ -328,7 +317,7 @@ class GSUOn(GSU):
                                     comment="s[%s] = s[sgprSizesSum] / %s"%(loopCounterName, depthU)))
         tmpSgprInfo = ContinuousRegister(idx=stmp, size=2)
         module.add(writer.calculateLoopNumIterOffsetGsu(kernel, loopCounterName, tmpSgprInfo))
-        module.addModuleAsFlatItems(writer.s_mul_u64_u32(sgpr(stmp+0), sgpr(stmp+1), sgpr(stmp+0), depthUDiv, comment=gsuOffsetStr))
+        module.addModuleAsFlatItems(writer.s_mul_u64_u32(sgpr(stmp+0), sgpr(stmp+1), sgpr(stmp+0), _DepthU, comment=gsuOffsetStr))
         module.add(gsucLabelEnd)
 
         unrollSummation = [ i for i in tP["ia"] if i in kernel["ProblemType"]["IndicesSummation"] ]
@@ -378,17 +367,16 @@ class GSUOn(GSU):
                 tmpSgpr = tmpSgprInfo.idx
                 gsuSgpr = tmpSgpr + 1
 
-                tcGR = tc if tc == "Metadata" else (tc + "GR")
-
                 # swizzle
-                mult_MI_Dim = ""
+                mult_MI_Dim = 1
                 if tc == "A" and kernel["ProblemType"]["SwizzleTensorA"]:
-                    mult_MI_Dim = "*MI_M"
+                    mult_MI_Dim = mult_MI_Dim * 16 # MI_M = 16
                 elif tc == "B" and kernel["ProblemType"]["SwizzleTensorB"]:
-                    mult_MI_Dim = "*MI_N"
+                    mult_MI_Dim = mult_MI_Dim * 16 # MI_N = 16
 
+                duBpe = kernel["_DepthU%s" % tc] * tP["bpeGR"] * mult_MI_Dim
                 module.add(SAndB32(dst=sgpr(gsuSgpr), src0=sgpr("GSU"), src1=hex(0x3FFF), comment="Restore GSU"))
-                module.add(SMulI32(dst=sgpr(gsuSgpr), src0=sgpr(gsuSgpr), src1="DepthU*Bpe%s%s"%(tcGR, mult_MI_Dim), comment="GSU*DepthU*Bpe%s"%(mult_MI_Dim)))
+                module.add(SMulI32(dst=sgpr(gsuSgpr), src0=sgpr(gsuSgpr), src1=duBpe, comment="GSU*DepthU*BpeGR*MI_M"))
                 module.add(SAndB32(dst=sgpr(tmpSgpr), src0=sgpr("GSU"), src1=hex(0x8000), comment="SCC = (GSUC == 1) ?"))
 
                 m = sgpr(gsuSgpr)
@@ -397,19 +385,12 @@ class GSUOn(GSU):
                     m.setMinus(True)
 
                 incr = sgpr("GlobalReadIncs%s+%u"%(tc, loopIdx))
-                duBpe = "DepthU*Bpe%s%s"%(tcGR, mult_MI_Dim)
                 # multiply by stride, optimizing if unit stride
                 if writer.isConstUnitStride(stride):
                     module.add(SCSelectB32(dst=incr, src0=duBpe, src1=m, comment="incr%s (unrollIdx)"%(tc)))
                 else:
                     module.add(SCMovB32(dst=m, src=duBpe, comment="DepthU*Bpe if GSUC = 1"))
                     module.add(SMulI32(dst=incr, src0=m, src1=stride, comment="incr%s unrollIdx)"%(tc) ))
-
-                if kernel["ProblemType"]["Sparse"]:
-                    if tP["is_sparse"]:
-                        module.add(SLShiftRightB32(dst=incr, shiftHex=hex(log2(2)), src=incr))
-                    elif tP["isM"]:
-                        module.add(SLShiftRightB32(dst=incr, shiftHex=hex(log2(8)), src=incr))
 
         return module
 

@@ -622,6 +622,30 @@ def problemTypeToEnum(problemType):
       problemType["DataTypeMetadata"] = \
           problemType["DataTypeMetadata"].value
 
+def getRealDataTypeA(dataType):
+    if dataType == DataTypeEnum.Float8BFloat8.value:
+        return DataTypeEnum.Float8BFloat8.value
+    elif dataType == DataTypeEnum.BFloat8Float8.value:
+        return DataTypeEnum.BFloat8Float8.value
+    elif dataType == DataTypeEnum.Float8BFloat8_fnuz.value:
+        return DataTypeEnum.Float8BFloat8_fnuz.value
+    elif dataType == DataTypeEnum.BFloat8Float8_fnuz.value:
+        return DataTypeEnum.BFloat8Float8_fnuz.value
+    else:
+        return dataType
+
+def getRealDataTypeB(dataType):
+    if dataType == DataTypeEnum.Float8BFloat8.value:
+        return DataTypeEnum.Float8BFloat8.value
+    elif dataType == DataTypeEnum.BFloat8Float8.value:
+        return DataTypeEnum.BFloat8Float8.value
+    elif dataType == DataTypeEnum.Float8BFloat8_fnuz.value:
+        return DataTypeEnum.Float8BFloat8_fnuz.value
+    elif dataType == DataTypeEnum.BFloat8Float8_fnuz.value:
+        return DataTypeEnum.BFloat8Float8_fnuz.value
+    else:
+        return dataType
+
 class ProblemType(Mapping):
   ########################################
 
@@ -638,19 +662,37 @@ class ProblemType(Mapping):
     # adjusting all data types
     if "DataType" in config:
       self["DataType"]  = DataType(config["DataType"])
+      self["MacDataTypeA"] = self["DataType"]
+      self["MacDataTypeB"] = self["DataType"]
       self["DataTypeA"] = self["DataType"]
       self["DataTypeB"] = self["DataType"]
     else:
       raise Exception("NO data type specified")
+      self["MacDataTypeA"] = DataType(0)
+      self["MacDataTypeB"] = DataType(0)
       self["DataType"]  = DataType(0)
       self["DataTypeA"] = DataType(0)
       self["DataTypeB"] = DataType(0)
 
+    if "MacDataTypeA" in config:
+      self["MacDataTypeA"] = DataType(config["MacDataTypeA"])
+    self["MacDataTypeA"] = getRealDataTypeA(self["MacDataTypeA"])
+
+    if "MacDataTypeB" in config:
+      self["MacDataTypeB"] = DataType(config["MacDataTypeB"])
+    self["MacDataTypeB"] = getRealDataTypeB(self["MacDataTypeB"])
+
     if "DataTypeA" in config:
       self["DataTypeA"] = DataType(config["DataTypeA"])
+    else:
+      self["DataTypeA"] = self["MacDataTypeA"]
+    self["DataTypeA"] = getRealDataTypeA(self["DataTypeA"])
 
     if "DataTypeB" in config:
       self["DataTypeB"] = DataType(config["DataTypeB"])
+    else:
+      self["DataTypeB"] = self["MacDataTypeB"]
+    self["DataTypeB"] = getRealDataTypeB(self["DataTypeB"])
 
     if "DestDataType" in config:
       self["DestDataType"] = DataType(config["DestDataType"])
