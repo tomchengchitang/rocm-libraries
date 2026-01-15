@@ -897,4 +897,21 @@ namespace rocisa
                                int                                       multiplier,
                                const std::optional<ContinuousRegister>&  tmpSgprRes = std::nullopt,
                                const std::string&                        comment    = "");
+    
+    // Multiply scalar for Bpe
+    // product register, operand register, bpe
+    std::shared_ptr<Module>
+        scalarMultiplyBpe(const std::shared_ptr<RegisterContainer>& product,
+                        const std::shared_ptr<RegisterContainer>& operand,
+                        double                                    bpe,
+                        const std::string&                        comment = "");
+
+    // Multiply vector for Bpe
+    // product register, operand register, bpe
+    std::shared_ptr<Module>
+        vectorMultiplyBpe(const std::shared_ptr<RegisterContainer>& product,
+                        const std::shared_ptr<RegisterContainer>& operand,
+                        double                                    bpe,
+                        const std::string&                        comment = "");
+
 } // namespace rocisa

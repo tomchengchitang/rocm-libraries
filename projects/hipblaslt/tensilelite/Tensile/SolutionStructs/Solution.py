@@ -618,6 +618,11 @@ class Solution(collections.abc.Mapping):
       reject(state, printRejectionReason, "DirectToVgpr is for MatrixInstruction only")
       return False
 
+    tmplrvw = (state["LocalReadVectorWidth"] // 2) if state["ProblemType"]["Sparse"] else state["LocalReadVectorWidth"]
+    if tmplrvw < state["MIInputPerThread"]:
+      reject(state, "LocalReadVectorWidth < MIInputPerThread %d" % state["MIInputPerThread"])
+      return False
+
     # disable the following combinations for initial implementation
     # TODO: enable them (for pure DTV)
     if (state["LocalSplitU"] != 1) and (not state["ProblemType"]["TLU%c"%tc]) and (not isSwizzle):

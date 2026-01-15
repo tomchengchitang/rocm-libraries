@@ -276,6 +276,78 @@ namespace rocisa
         }
         return module;
     }
+
+    std::shared_ptr<Module>
+        scalarMultiplyBpe(const std::shared_ptr<RegisterContainer>& product,
+                        const std::shared_ptr<RegisterContainer>& operand,
+                        double                                    bpe,
+                        const std::string&                        comment)
+    {
+        auto module    = std::make_shared<Module>("scalarMultiplyBpe");
+        std::string cmt = comment.empty()
+                            ? product->toString() + " = " + operand->toString()
+                                    + " * bpe(" + std::to_string(bpe) + ")"
+                            : comment + " (multiple bpe " + std::to_string(bpe) + ")";
+
+        if(bpe == 0.5)
+        {
+            module->addT<SLShiftRightB32>(product, 1, operand, cmt);
+        }
+        else if(bpe == 0.75)
+        {
+            module->addT<SMulI32>(product, 6, operand, cmt);
+            module->addT<SLShiftRightB32>(product, 3, product, cmt);
+        }
+        else
+        {
+            int bpeLog2 = static_cast<int>(std::log2(bpe) + 0.5);
+            if(bpeLog2 == 0 && (*product == *operand))
+            {
+                module->addCommentAlign(cmt + " (bpe is 1, do nothing)");
+            }
+            else
+            {
+                module->addT<SLShiftLeftB32>(product, bpeLog2, operand, cmt);
+            }
+        }
+        return module;
+    }
+
+    std::shared_ptr<Module>
+        vectorMultiplyBpe(const std::shared_ptr<RegisterContainer>& product,
+                        const std::shared_ptr<RegisterContainer>& operand,
+                        double                                    bpe,
+                        const std::string&                        comment)
+    {
+        auto module = std::make_shared<Module>("vectorMultiplyBpe");
+        std::string cmt = comment.empty()
+                            ? product->toString() + " = " + operand->toString()
+                                    + " * bpe(" + std::to_string(bpe) + ")"
+                            : comment + " (multiple bpe " + std::to_string(bpe) + ")";
+
+        if(bpe == 0.5)
+        {
+            module->addT<VLShiftRightB32>(product, 1, operand, cmt);
+        }
+        else if(bpe == 0.75)
+        {
+            module->addT<VMulLOU32>(product, 6, operand, cmt);
+            module->addT<VLShiftRightB32>(product, 3, product, cmt);
+        }
+        else
+        {
+            int bpeLog2 = static_cast<int>(std::log2(bpe) + 0.5);
+            if(bpeLog2 == 0 && (*product == *operand))
+            {
+                module->addCommentAlign(cmt + " (bpe is 1, do nothing)");
+            }
+            else
+            {
+                module->addT<VLShiftLeftB32>(product, bpeLog2, operand, cmt);
+            }
+        }
+        return module;
+    }
 } // namespace rocisa
 
 void math_func(nb::module_ m)
@@ -623,4 +695,16 @@ void math_func(nb::module_ m)
           nb::arg("multiplier"),
           nb::arg("tmpSgprRes") = std::nullopt,
           nb::arg("comment")    = "");
+    m.def("scalarMultiplyBpe",
+      &rocisa::scalarMultiplyBpe,
+      nb::arg("product"),
+      nb::arg("operand"),
+      nb::arg("bpe"),
+      nb::arg("comment") = "");
+    m.def("vectorMultiplyBpe",
+      &rocisa::vectorMultiplyBpe,
+      nb::arg("product"),
+      nb::arg("operand"),
+      nb::arg("bpe"),
+      nb::arg("comment") = "");
 }
