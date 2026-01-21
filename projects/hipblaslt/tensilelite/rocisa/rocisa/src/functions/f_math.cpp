@@ -278,6 +278,120 @@ namespace rocisa
     }
 
     std::shared_ptr<Module>
+        scalarMultiply64Bpe(const std::shared_ptr<RegisterContainer>& product,
+                            const std::shared_ptr<RegisterContainer>& operand,
+                            double                                    bpe,
+                            const std::optional<ContinuousRegister>&  tmpSgprRes,
+                            const std::string&                        comment)
+    {
+        if(product->regNum < 2 || operand->regNum < 2)
+        {
+            throw std::runtime_error("scalarMultiply64Bpe expects 64-bit (2-dword) registers");
+        }
+
+        auto        module = std::make_shared<Module>("scalarMultiply64Bpe");
+        std::string cmt    = comment.empty()
+                               ? product->toString() + " = " + operand->toString() + " * bpe("
+                                     + std::to_string(bpe) + ")"
+                               : comment + " (multiple bpe " + std::to_string(bpe) + ")";
+
+        if(bpe == 0.5)
+        {
+            module->addT<SLShiftRightB64>(product, 1, operand, cmt);
+        }
+        else if(bpe == 0.75)
+        {
+            if(!tmpSgprRes || tmpSgprRes->size < 1)
+            {
+                throw std::runtime_error("Invalid tmpSgprRes, must be at least 1 for bpe==0.75");
+            }
+
+            auto [productLo, productHi] = product->splitRegContainer();
+            auto [operandLo, operandHi] = operand->splitRegContainer();
+
+            auto tmpSgpr = sgpr(tmpSgprRes->idx);
+
+            module->addT<SMovB32>(tmpSgpr, operandHi, cmt);
+            module->addT<SMulHIU32>(productHi, 6, operandLo, cmt);
+            module->addT<SMulI32>(productLo, 6, operandLo, cmt);
+            module->addT<SMulI32>(tmpSgpr, 6, tmpSgpr, cmt);
+            module->addT<SAddU32>(productHi, productHi, tmpSgpr, cmt);
+            module->addT<SLShiftRightB64>(product, 3, product, cmt);
+        }
+        else
+        {
+            int bpeLog2 = static_cast<int>(std::log2(bpe) + 0.5);
+            if(bpeLog2 == 0 && (*product == *operand))
+            {
+                module->addCommentAlign(cmt + " (bpe is 1, do nothing)");
+            }
+            else
+            {
+                module->addT<SLShiftLeftB64>(product, bpeLog2, operand, cmt);
+            }
+        }
+
+        return module;
+    }
+
+    std::shared_ptr<Module>
+        vectorMultiply64Bpe(const std::shared_ptr<RegisterContainer>& product,
+                            const std::shared_ptr<RegisterContainer>& operand,
+                            double                                    bpe,
+                            const std::optional<ContinuousRegister>&  tmpVgprRes,
+                            const std::string&                        comment)
+    {
+        if(product->regNum < 2 || operand->regNum < 2)
+        {
+            throw std::runtime_error("vectorMultiply64Bpe expects 64-bit (2-dword) registers");
+        }
+
+        auto        module = std::make_shared<Module>("vectorMultiply64Bpe");
+        std::string cmt    = comment.empty()
+                               ? product->toString() + " = " + operand->toString() + " * bpe("
+                                     + std::to_string(bpe) + ")"
+                               : comment + " (multiple bpe " + std::to_string(bpe) + ")";
+
+        if(bpe == 0.5)
+        {
+            module->addT<VLShiftRightB64>(product, 1, operand, cmt);
+        }
+        else if(bpe == 0.75)
+        {
+            if(!tmpVgprRes || tmpVgprRes->size < 1)
+            {
+                throw std::runtime_error("Invalid tmpVgprRes, must be at least 1 for bpe==0.75");
+            }
+
+            auto [productLo, productHi] = product->splitRegContainer();
+            auto [operandLo, operandHi] = operand->splitRegContainer();
+
+            auto tmpVgpr = vgpr(tmpVgprRes->idx);
+
+            module->addT<VMovB32>(tmpVgpr, operandHi, std::nullopt, cmt);
+            module->addT<VMulHIU32>(productHi, 6, operandLo, cmt);
+            module->addT<VMulLOU32>(productLo, 6, operandLo, cmt);
+            module->addT<VMulLOU32>(tmpVgpr, 6, tmpVgpr, cmt);
+            module->addT<VAddU32>(productHi, productHi, tmpVgpr, cmt);
+            module->addT<VLShiftRightB64>(product, 3, product, cmt);
+        }
+        else
+        {
+            int bpeLog2 = static_cast<int>(std::log2(bpe) + 0.5);
+            if(bpeLog2 == 0 && (*product == *operand))
+            {
+                module->addCommentAlign(cmt + " (bpe is 1, do nothing)");
+            }
+            else
+            {
+                module->addT<VLShiftLeftB64>(product, bpeLog2, operand, cmt);
+            }
+        }
+
+        return module;
+    }
+
+    std::shared_ptr<Module>
         scalarMultiplyBpe(const std::shared_ptr<RegisterContainer>& product,
                         const std::shared_ptr<RegisterContainer>& operand,
                         double                                    bpe,
@@ -695,6 +809,20 @@ void math_func(nb::module_ m)
           nb::arg("multiplier"),
           nb::arg("tmpSgprRes") = std::nullopt,
           nb::arg("comment")    = "");
+    m.def("scalarMultiply64Bpe",
+      &rocisa::scalarMultiply64Bpe,
+      nb::arg("product"),
+      nb::arg("operand"),
+      nb::arg("bpe"),
+      nb::arg("tmpSgprRes") = std::nullopt,
+      nb::arg("comment") = "");
+    m.def("vectorMultiply64Bpe",
+      &rocisa::vectorMultiply64Bpe,
+      nb::arg("product"),
+      nb::arg("operand"),
+      nb::arg("bpe"),
+      nb::arg("tmpVgprRes") = std::nullopt,
+      nb::arg("comment") = "");
     m.def("scalarMultiplyBpe",
       &rocisa::scalarMultiplyBpe,
       nb::arg("product"),

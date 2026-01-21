@@ -898,6 +898,26 @@ namespace rocisa
                                const std::optional<ContinuousRegister>&  tmpSgprRes = std::nullopt,
                                const std::string&                        comment    = "");
     
+
+
+    // Multiply scalar for 64bit Bpe
+    // product register (2 regs), operand register (2 regs), bpe
+    std::shared_ptr<Module>
+        scalarMultiply64Bpe(const std::shared_ptr<RegisterContainer>& product,
+                            const std::shared_ptr<RegisterContainer>& operand,
+                            double                                    bpe,
+                            const std::optional<ContinuousRegister>&  tmpSgprRes = std::nullopt,
+                            const std::string&                        comment    = "");
+
+    // Multiply vector for 64bit Bpe
+    // product register (2 regs), operand register (2 regs), bpe
+    std::shared_ptr<Module>
+        vectorMultiply64Bpe(const std::shared_ptr<RegisterContainer>& product,
+                            const std::shared_ptr<RegisterContainer>& operand,
+                            double                                    bpe,
+                            const std::optional<ContinuousRegister>&  tmpVgprRes = std::nullopt,
+                            const std::string&                        comment    = "");
+
     // Multiply scalar for Bpe
     // product register, operand register, bpe
     std::shared_ptr<Module>

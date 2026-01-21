@@ -318,7 +318,7 @@ class LocalReadMFMA(LocalRead):
 
                     offset, srcAddr = self.cal_offset_srcAddr(maxLDSConstOffset, tc, offset_val)
                     offset = applyPad(offset)
-                    ds = DSModifiers(na=1, offset=offset)
+                    ds = DSModifiers(na=1, offset=int(offset))
                     destVgpr = vgpr("Valu%s_X%u_I%u+%u+%u"%(tc,bufferIdx,iui, 4*tIdx, oIdx * 2), 2)
                     localReadCode = Module("LocalRead%s Valu%u"%(tc,valuiIdx))
                     localReadCode.add(LocalReadX(dst=destVgpr, src=srcAddr, ds=ds, comment=comment))
