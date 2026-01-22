@@ -63,7 +63,7 @@ namespace rocisa
  */
 
     std::string   TypeAbbrev(rocisa::DataType d);
-    size_t        GetElementSize(rocisa::DataType d);
+    float        GetElementSize(rocisa::DataType d);
     std::ostream& operator<<(std::ostream& stream, rocisa::DataType const& t);
     std::istream& operator>>(std::istream& stream, rocisa::DataType& t);
 
@@ -86,7 +86,7 @@ namespace TensileLite
         std::string      name;
         std::string      abbrev;
 
-        size_t elementSize;
+        float elementSize;
         size_t packing;
         size_t segmentSize;
 
@@ -125,11 +125,11 @@ namespace TensileLite
         constexpr static rocisa::DataType Enum = T_Enum;
 
         /// Bytes of one element.  May contain multiple segments.
-        constexpr static size_t ElementSize = sizeof(T);
+        constexpr static float ElementSize = float(sizeof(T)) / float(T_Packing);
         /// Segments per element.
         constexpr static size_t Packing = T_Packing;
         /// Bytes per segment.
-        constexpr static size_t SegmentSize = ElementSize / Packing;
+        constexpr static float SegmentSize = ElementSize / Packing;
 
         constexpr static bool IsComplex  = T_IsComplex;
         constexpr static bool IsIntegral = T_IsIntegral;
@@ -155,7 +155,7 @@ namespace TensileLite
               int              T_Packing,
               bool             T_IsComplex,
               bool             T_IsIntegral>
-    constexpr size_t BaseTypeInfo<T, T_Enum, T_Packing, T_IsComplex, T_IsIntegral>::ElementSize;
+    constexpr float BaseTypeInfo<T, T_Enum, T_Packing, T_IsComplex, T_IsIntegral>::ElementSize;
     template <typename T,
               rocisa::DataType T_Enum,
               int              T_Packing,
@@ -167,7 +167,7 @@ namespace TensileLite
               int              T_Packing,
               bool             T_IsComplex,
               bool             T_IsIntegral>
-    constexpr size_t BaseTypeInfo<T, T_Enum, T_Packing, T_IsComplex, T_IsIntegral>::SegmentSize;
+    constexpr float BaseTypeInfo<T, T_Enum, T_Packing, T_IsComplex, T_IsIntegral>::SegmentSize;
 
     template <typename T,
               rocisa::DataType T_Enum,
@@ -229,6 +229,11 @@ namespace TensileLite
     // Enum rocisa::DataType::Int8 maps to int8_t, struct TensileLite::Int8 is only used for LogTensor now
     template <>
     struct TypeInfo<int8_t> : public BaseTypeInfo<int8_t, rocisa::DataType::Int8, 1, false, true>
+    {
+    };
+
+    template <>
+    struct TypeInfo<Int8> : public BaseTypeInfo<Int8, rocisa::DataType::Int8, 1, false, true>
     {
     };
 
@@ -375,6 +380,7 @@ namespace TensileLite
 
     std::string ToString(ConstantVariant d);
     bool        CompareValue(const ConstantVariant& d, double value);
+    size_t multiplyElementSize(size_t element, float elementSize);
 
     /**
  * @}

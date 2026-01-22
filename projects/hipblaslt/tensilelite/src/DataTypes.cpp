@@ -78,7 +78,7 @@ namespace rocisa
         return "Invalid";
     }
 
-    size_t GetElementSize(rocisa::DataType d)
+    float GetElementSize(rocisa::DataType d)
     {
         switch(d)
         {

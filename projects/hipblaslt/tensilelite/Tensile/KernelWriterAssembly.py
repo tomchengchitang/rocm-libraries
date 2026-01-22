@@ -3911,12 +3911,6 @@ class KernelWriterAssembly(KernelWriter):
           comment="lw%s%s**(DepthU_Compute + PAD)"%(tc, self.states.unrollChar)))
       module.add(VAddU32(dst=vgpr(destVgpr), src0=vgpr(uReg), src1=vgpr(destVgpr), \
           comment="lwFO%s = (lw%s%s + lw%s%s*(DepthU+PAD))" % (tc, tc, tc, tc, self.states.unrollChar) ))
-      # if log2(tP["bpeDS"]) > 0:
-      #   module.add(VAddLShiftLeftU32(dst=vgpr(destVgpr), src0=vgpr(uReg), src1=vgpr(destVgpr), shiftHex=hex(log2(tP["bpeDS"])), \
-      #       comment="lwFO%s = (lw%s%s + lw%s%s*(DepthU+PAD))*bpeDS" % (tc, tc, tc, tc, self.states.unrollChar) ))
-      # else:
-      #   module.add(VAddU32(dst=vgpr(destVgpr), src0=vgpr(uReg), src1=vgpr(destVgpr), \
-      #       comment="lwFO%s = (lw%s%s + lw%s%s*(DepthU+PAD))*bpeDS(1)" % (tc, tc, tc, tc, self.states.unrollChar) ))
     else:
       lds_stride = kernel["MacroTile%s"%tc] + LdsPad
       module.add(VMulU32U24(dst=vgpr(destVgpr), src0=hex(lds_stride), src1=vgpr(uReg), \
@@ -3924,12 +3918,6 @@ class KernelWriterAssembly(KernelWriter):
       module.add(VAddU32(dst=vgpr(destVgpr), src0=vgpr(tP["gpr"]["lwoT"]), src1=vgpr(destVgpr), \
           comment="lwFO%s = (lw%s%s + lw%s%s*(MT%s+PAD))" % (tc, tc, tc, tc, self.states.unrollChar, tP["tileChar"]) ))
       module.add(vectorMultiplyBpe(vgpr(destVgpr), vgpr(destVgpr), tP["bpeDS"]))
-      # if log2(tP["bpeDS"]) > 0:
-      #   module.add(VAddLShiftLeftU32(dst=vgpr(destVgpr), src0=vgpr(tP["gpr"]["lwoT"]), src1=vgpr(destVgpr), shiftHex=hex(log2(tP["bpeDS"])), \
-      #       comment="lwFO%s = (lw%s%s + lw%s%s*(MT%s+PAD))*bpeDS" % (tc, tc, tc, tc, self.states.unrollChar, tP["tileChar"]) ))
-      # else:
-      #   module.add(VAddU32(dst=vgpr(destVgpr), src0=vgpr(tP["gpr"]["lwoT"]), src1=vgpr(destVgpr), \
-      #       comment="lwFO%s = (lw%s%s + lw%s%s*(MT%s+PAD))*bpeDS(1)" % (tc, tc, tc, tc, self.states.unrollChar, tP["tileChar"]) ))
 
     # LdsBlockSizePerPad: add padding
     if kernel["LdsBlockSizePerPad%s"%tc] != 0 and kernel["LdsPad%s"%tc] != 0:
