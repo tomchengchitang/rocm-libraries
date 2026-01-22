@@ -1903,8 +1903,13 @@ namespace
         // push 2 activation arguments
         std::visit(
             [&inputs, &prob](auto val) {
-                inputs.activationArgs.push_back((decltype(val))prob.act0);
-                inputs.activationArgs.push_back((decltype(val))prob.act1);
+                if constexpr (std::is_same_v<decltype(val), TensileLite::Float4x2>) {
+                    inputs.activationArgs.push_back(TensileLite::Float4x2(prob.act0, prob.act0));
+                    inputs.activationArgs.push_back(TensileLite::Float4x2(prob.act1, prob.act1));
+                } else {
+                    inputs.activationArgs.push_back((decltype(val))prob.act0);
+                    inputs.activationArgs.push_back((decltype(val))prob.act1);
+                }
                 if(prob.k)
                     inputs.alpha = *(decltype(val)*)(prob.alpha);
                 else

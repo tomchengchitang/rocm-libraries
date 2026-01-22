@@ -36,6 +36,7 @@
 
 #include <Tensile/Comparison.hpp>
 #include <Tensile/DataTypes_BFloat16.hpp>
+#include <Tensile/DataTypes_Float4.hpp>
 #include <rocisa/include/enum.hpp>
 // Using hip header for both NANOO and OCP data types
 #if defined(__HIPCC__)
@@ -47,7 +48,6 @@
 #include <Tensile/DataTypes_Int8.hpp>
 #include <Tensile/DataTypes_Int8x4.hpp>
 #include <Tensile/DataTypes_XFloat32.hpp>
-
 namespace rocisa
 {
     /**
@@ -295,6 +295,12 @@ namespace TensileLite
                                                               false>
     {
     };
+#ifdef TENSILE_USE_FP4
+    template <>
+    struct TypeInfo<Float4x2> : public BaseTypeInfo<Float4x2, rocisa::DataType::Float4, 2, false, false>
+    {
+    };
+#endif // #ifdef TENSILE_USE_FP4
 
     // Variant for constants
     using ConstantVariant = std::variant<float,
@@ -310,7 +316,11 @@ namespace TensileLite
                                          BFloat8,
                                          Float8_fnuz,
                                          BFloat8_fnuz,
-                                         int8_t>;
+                                         int8_t
+#ifdef TENSILE_USE_FP4
+                                       , Float4x2
+#endif // #ifdef TENSILE_USE_FP4
+                                        >;
 
     // Convert variants to type T
     template <typename T>
@@ -377,6 +387,22 @@ namespace TensileLite
     {
         return static_cast<T>(*std::get_if<Int8x4>(&val));
     }
+
+#ifdef TENSILE_USE_FP4
+    // Convert variants to type T
+    template <typename T>
+    typename std::enable_if<std::is_same<Float4x2, T>::value, T>::type
+        constVariantCast(const ConstantVariant& val)
+    {
+        switch(val.index())
+        {
+        case static_cast<int>(rocisa::DataType::Float4):
+            return static_cast<T>(*std::get_if<Float4x2>(&val));
+        default:
+            throw std::runtime_error("Unsupported variant cast type.");
+        }
+    }
+#endif // #ifdef TENSILE_USE_FP4
 
     std::string ToString(ConstantVariant d);
     bool        CompareValue(const ConstantVariant& d, double value);

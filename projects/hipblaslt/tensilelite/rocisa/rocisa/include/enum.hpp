@@ -54,6 +54,9 @@ namespace rocisa
         BFloat8,
         Float8BFloat8,
         BFloat8Float8,
+#ifdef TENSILE_USE_FP4
+        Float4,
+#endif // #ifdef TENSILE_USE_FP4
         Count,
         None = Count
     };
