@@ -54,9 +54,7 @@ namespace rocisa
         BFloat8,
         Float8BFloat8,
         BFloat8Float8,
-#ifdef TENSILE_USE_FP4
         Float4,
-#endif // #ifdef TENSILE_USE_FP4
         Count,
         None = Count
     };
@@ -204,7 +202,8 @@ namespace rocisa
         INST_TR16_B128  = 38,
         INST_CVT        = 39,
         INST_MACRO      = 40,
-        INST_NOTYPE     = 41
+        INST_F4         = 41,
+        INST_NOTYPE     = 42
     };
 
     enum class SelectBit : int

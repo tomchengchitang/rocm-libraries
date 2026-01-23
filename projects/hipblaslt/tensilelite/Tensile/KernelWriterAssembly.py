@@ -6502,6 +6502,8 @@ class KernelWriterAssembly(KernelWriter):
       elif (abbrev == 'bf8_fp8' and sourceSwap == False) or \
           (abbrev == 'fp8_bf8' and sourceSwap == True):
           return InstType.INST_BF8_F8
+      elif abbrev == 'fp4_fp4':
+          return InstType.INST_F4
       else:
           assert("Unsupported data type.")
       return InstType.INST_NOTYPE

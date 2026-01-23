@@ -144,6 +144,8 @@ namespace rocisa
                 return variant[2] > 32 ? "f8f6f4" : "fp8_bf8";
             case InstType::INST_BF8_F8:
                 return variant[2] > 32 ? "f8f6f4" : "bf8_fp8";
+            case InstType::INST_F4:
+                return variant[2] > 32 ? "f8f6f4" : "fp4_fp4";
             default:
                 throw std::runtime_error("Type not found");
             }
@@ -188,6 +190,9 @@ namespace rocisa
                 {
                 case InstType::INST_F8:
                     inputPermuteStr = variant[2] > 32 ? " cbsz:0 blgp:0" : "";
+                    break;
+                case InstType::INST_F4:
+                    inputPermuteStr = variant[2] > 32 ? " cbsz:4 blgp:4" : "";
                     break;
                 case InstType::INST_BF8:
                     inputPermuteStr = variant[2] > 32 ? " cbsz:1 blgp:1" : "";
@@ -291,6 +296,8 @@ namespace rocisa
                 return "fp8_bf8";
             case InstType::INST_BF8_F8:
                 return "bf8_fp8";
+            case InstType::INST_F4:
+                return "fp4_fp4";
             default:
                 throw std::runtime_error("Type not found");
             }
