@@ -37,6 +37,7 @@
 #include <Tensile/Comparison.hpp>
 #include <Tensile/DataTypes_BFloat16.hpp>
 #include <Tensile/DataTypes_Float4.hpp>
+#include <Tensile/DataTypes_MXScale.hpp>
 #include <rocisa/include/enum.hpp>
 // Using hip header for both NANOO and OCP data types
 #if defined(__HIPCC__)
@@ -302,6 +303,12 @@ namespace TensileLite
     };
 #endif // #ifdef TENSILE_USE_FP4
 
+    template <>
+    struct TypeInfo<MXScale>
+        : public BaseTypeInfo<MXScale, rocisa::DataType::MXScale, 1, false, false>
+    {
+    };
+
     // Variant for constants
     using ConstantVariant = std::variant<float,
                                          double,
@@ -320,6 +327,7 @@ namespace TensileLite
 #ifdef TENSILE_USE_FP4
                                        , Float4x2
 #endif // #ifdef TENSILE_USE_FP4
+                                       , MXScale
                                         >;
 
     // Convert variants to type T

@@ -584,6 +584,8 @@ namespace TensileLite
         gemm.m_tensors[ContractionProblemGemm::TENSOR::METADATA]   = TensorDescriptor("metadata");
         gemm.m_tensors[ContractionProblemGemm::TENSOR::AMAXD]      = TensorDescriptor("amaxD");
         gemm.m_tensors[ContractionProblemGemm::TENSOR::COMPRESSED] = TensorDescriptor("compressed");
+        gemm.m_tensors[ContractionProblemGemm::TENSOR::MXSA]     = TensorDescriptor("mxScaleA");
+        gemm.m_tensors[ContractionProblemGemm::TENSOR::MXSB]     = TensorDescriptor("mxScaleB");
         return gemm;
     }
 
@@ -1373,6 +1375,32 @@ namespace TensileLite
         return rv;
     }
 
+    void ContractionProblemGemm::setMXScaleA(int mxBlockA, std::vector<size_t> saStride)
+    {
+        m_mxBlockA = mxBlockA;
+
+        if (mxBlockA)
+        {
+            std::vector<size_t> saSizes = m_tensors[ContractionProblemGemm::TENSOR::A].sizes();
+            saSizes[m_boundIndices[0].a] = saSizes[m_boundIndices[0].a] / mxBlockA;
+            TensorDescriptor mxsa("mxScaleA", rocisa::DataType::MXScale, saSizes.begin(), saSizes.end(), saStride.begin(), saStride.end());
+            m_tensors[ContractionProblemGemm::TENSOR::MXSA] = mxsa;
+        }
+    }
+
+    void ContractionProblemGemm::setMXScaleB(int mxBlockB, std::vector<size_t> sbStride)
+    {
+        m_mxBlockB = mxBlockB;
+
+        if (mxBlockB)
+        {
+            std::vector<size_t> sbSizes = m_tensors[ContractionProblemGemm::TENSOR::B].sizes();
+            sbSizes[m_boundIndices[0].b] = sbSizes[m_boundIndices[0].b] / mxBlockB;
+            TensorDescriptor mxsb("mxScaleB", rocisa::DataType::MXScale, sbSizes.begin(), sbSizes.end(), sbStride.begin(), sbStride.end());
+            m_tensors[ContractionProblemGemm::TENSOR::MXSB] = mxsb;
+        }
+    }
+
     std::string ContractionProblemGemm::description() const
     {
         auto&              aTensor = m_tensors[ContractionProblemGemm::TENSOR::A];
@@ -1614,7 +1642,9 @@ namespace TensileLite
                                          void*                _ws,
                                          void*                _Synchronizer,
                                          unsigned char const* _metadata,
-                                         void const*          _compressed)
+                                         void const*          _compressed,
+                                         void const*          _mxsa,
+                                         void const*          _mxsb)
         : a(_a)
         , b(_b)
         , c(_c)
@@ -1635,6 +1665,8 @@ namespace TensileLite
         , Synchronizer(_Synchronizer)
         , metadata(_metadata)
         , compressed(_compressed)
+        , mxsa(_mxsa)
+        , mxsb(_mxsb)
     {
     }
 

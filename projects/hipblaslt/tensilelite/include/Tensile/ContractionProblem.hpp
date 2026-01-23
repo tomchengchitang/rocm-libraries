@@ -306,6 +306,8 @@ namespace TensileLite
             Synchronizer  = 12,
             AMAXD         = 13,
             COMPRESSED    = 14,
+            MXSA          = 15,
+            MXSB          = 16,
             TENSOR_COUNT
         };
 
@@ -1049,6 +1051,20 @@ namespace TensileLite
             m_swizzleTensorB = swizzle;
         }
 
+        void setMXScaleA(int mxBlock, std::vector<size_t> saStride = {});
+
+        size_t mxBlockA() const
+        {
+            return m_mxBlockA;
+        }
+
+        void setMXScaleB(int mxBlock, std::vector<size_t> sbStride = {});
+
+        size_t mxBlockB() const
+        {
+            return m_mxBlockB;
+        }
+
         /// Allocated elements excluding batch dimensions
         /// Used in assembly kernels to determine buffer limits, if batch dimes not
         /// packed
@@ -1107,6 +1123,14 @@ namespace TensileLite
         TensorDescriptor const& amaxd() const
         {
             return m_tensors[ContractionProblemGemm::TENSOR::AMAXD];
+        }
+        TensorDescriptor const& mxsa() const
+        {
+            return m_tensors[ContractionProblemGemm::TENSOR::MXSA];
+        }
+        TensorDescriptor const& mxsb() const
+        {
+            return m_tensors[ContractionProblemGemm::TENSOR::MXSB];
         }
         TensorOps const& aOps() const
         {
@@ -1293,6 +1317,8 @@ namespace TensileLite
         ActivationType   m_activationType          = ActivationType::None;
         bool             m_activationNoGuard       = false;
         int              m_sparse                  = 0;
+        int              m_mxBlockA                = 0;
+        int              m_mxBlockB                = 0;
 
         KernelLanguage    m_kernelLanguage    = KernelLanguage::Any;
         PerformanceMetric m_performanceMetric = PerformanceMetric::DeviceEfficiency;
@@ -1396,7 +1422,9 @@ namespace TensileLite
                           void*                _ws,
                           void*                _Synchronizer,
                           unsigned char const* _metadata,
-                          void const*          _compressed);
+                          void const*          _compressed,
+                          void const*          _mxsa,
+                          void const*          _mxsb);
 
         ContractionInputs(void const*     _a,
                           void const*     _b,
@@ -1428,6 +1456,8 @@ namespace TensileLite
 
         unsigned char const* metadata = nullptr;
         void const* compressed        = nullptr;
+        void const* mxsa          = nullptr;
+        void const* mxsb          = nullptr;
 
         // Constants
         ConstantVariant              alpha = static_cast<float>(0);

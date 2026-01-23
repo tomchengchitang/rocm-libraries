@@ -469,6 +469,9 @@ _defaultProblemType = {
     "SupportUserArgs": True,
     "SwizzleTensorA": False,
     "SwizzleTensorB": False,
+    # MX Block
+    "MXBlockA": 0,
+    "MXBlockB": 0,
 }
 
 # The supported typed GEMM, each entry is (Ti, To, Tc).
@@ -1068,6 +1071,12 @@ class ProblemType(Mapping):
 
     if self["SwizzleTensorB"]:
       name.append("STB")
+
+    if self["MXBlockA"]:
+      name.append(f'MXA{self["MXBlockA"]}')
+
+    if self["MXBlockB"]:
+      name.append(f'MXB{self["MXBlockB"]}')
 
     # Other
     other = ""

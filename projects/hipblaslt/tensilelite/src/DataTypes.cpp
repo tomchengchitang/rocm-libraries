@@ -77,6 +77,8 @@ namespace rocisa
         case rocisa::DataType::Float4:
             return "F4";
 #endif // #ifdef TENSILE_USE_FP4
+        case DataType::MXScale:
+            return "MX";
         case rocisa::DataType::Count:
         }
         return "Invalid";
@@ -128,6 +130,8 @@ namespace rocisa
         case rocisa::DataType::Float4:
             return TensileLite::TypeInfo<TensileLite::Float4x2>::ElementSize;
 #endif // #ifdef TENSILE_USE_FP4
+        case rocisa::DataType::MXScale:
+            return TensileLite::TypeInfo<TensileLite::MXScale>::ElementSize;
         case rocisa::DataType::Count:
         }
         return 1;
@@ -250,6 +254,7 @@ namespace TensileLite
 #ifdef TENSILE_USE_FP4
         registerTypeInfo<Float4x2>();
 #endif // #ifdef TENSILE_USE_FP4
+        registerTypeInfo<MXScale>();
     }
 
     void DataTypeInfo::registerAllTypeInfoOnce()

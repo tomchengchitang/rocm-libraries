@@ -55,6 +55,7 @@ namespace rocisa
         Float8BFloat8,
         BFloat8Float8,
         Float4,
+        MXScale,
         Count,
         None = Count
     };
@@ -148,6 +149,10 @@ namespace rocisa
             return "Float8BFloat8";
         case DataType::BFloat8Float8:
             return "BFloat8Float8";
+        case DataType::Float4:
+            return "Float4";
+        case DataType::MXScale:
+            return "MXScale";
         default:
             return "Invalid";
         }

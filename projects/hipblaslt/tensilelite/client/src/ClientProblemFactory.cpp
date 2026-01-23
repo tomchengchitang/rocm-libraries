@@ -54,6 +54,8 @@ namespace TensileLite
             , m_useUserArgs(false)
             , m_swizzleTensorA(false)
             , m_swizzleTensorB(false)
+            , m_mxBlockA(args["mx-block-a"].as<int>())
+            , m_mxBlockB(args["mx-block-b"].as<int>())
             , m_aOps(args["a-ops"].as<TensorOps>())
             , m_bOps(args["b-ops"].as<TensorOps>())
             , m_cOps(args["c-ops"].as<TensorOps>())
@@ -126,7 +128,10 @@ namespace TensileLite
                     m_tensorStrides[i] = std::vector<std::vector<size_t>>();
                 }
             }
-            // Get constant types
+            
+            m_tensorTypes[ContractionProblemGemm::TENSOR::MXSA] = DataType::MXScale;
+            m_tensorTypes[ContractionProblemGemm::TENSOR::MXSB] = DataType::MXScale;
+// Get constant types
             for(size_t i = 0; i < constants.size(); i++)
             {
                 std::string typeName = constants[i].name + "-type";
@@ -428,6 +433,14 @@ namespace TensileLite
                             rv.back().setF32XdlMathOp(m_f32XdlMathOp);
                             rv.back().setActivationComputeType(m_activationComputeType);
                             rv.back().setUseDeviceUserArguments(m_useUserArgs);
+                            if(m_mxBlockA)
+                            {
+                                rv.back().setMXScaleA(m_mxBlockA);
+                            }
+                            if(m_mxBlockB)
+                            {
+                                rv.back().setMXScaleB(m_mxBlockB);
+                            }
                         }
                     }
                 }

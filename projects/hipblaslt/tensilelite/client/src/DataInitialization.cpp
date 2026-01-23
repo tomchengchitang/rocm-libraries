@@ -1796,6 +1796,9 @@ namespace TensileLite
                         prop.value = getValue<Float4x2>(prop.init, prop.freeValue);
                         break;
 #endif // #ifdef TENSILE_USE_FP4
+                    case rocisa::DataType::MXScale:
+                        prop.value = getValue<MXScale>(prop.init, prop.freeValue);
+                        break;
                     case rocisa::DataType::Int64:
                     case rocisa::DataType::XFloat32:
                     case rocisa::DataType::Count:
@@ -2167,6 +2170,8 @@ namespace TensileLite
             inputs->Synchronizer  = (void*)ptrs[ContractionProblemGemm::TENSOR::Synchronizer];
             inputs->amaxD         = (void*)ptrs[ContractionProblemGemm::TENSOR::AMAXD];
             inputs->compressed    = (void*)ptrs[ContractionProblemGemm::TENSOR::COMPRESSED];
+            inputs->mxsa          = (void*)ptrs[ContractionProblemGemm::TENSOR::MXSA];
+            inputs->mxsb          = (void*)ptrs[ContractionProblemGemm::TENSOR::MXSB];
 
             inputs->batchA    = (void**)batchPtrs[ContractionProblemGemm::TENSOR::A];
             inputs->batchB    = (void**)batchPtrs[ContractionProblemGemm::TENSOR::B];
