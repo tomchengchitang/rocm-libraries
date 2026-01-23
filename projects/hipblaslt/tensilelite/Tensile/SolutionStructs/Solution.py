@@ -2526,6 +2526,10 @@ class Solution(collections.abc.Mapping):
     if state["AssertSummationElementMultiple"] % state["DepthU"] == 0:
       state["NoTailLoop"] = True
 
+    # TODO: disable Tail Loop when bpe < 1
+    if state["ProblemType"]["MacDataTypeA"].numBytes() < 1:
+      state["NoTailLoop"] = True
+
     # TailloopInNll optimization check
     if state["TailloopInNll"]:
       # Disable TailloopInNll
