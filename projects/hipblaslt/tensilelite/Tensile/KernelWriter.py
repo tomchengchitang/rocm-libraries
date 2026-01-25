@@ -2118,8 +2118,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if not forceNoTileCode and self.states.staggerU:
       module.add(self.declareStaggerParms(kernel))
       module.add(self.calculateStagger(kernel, tensorParametersA))
+      if kernel["ProblemType"]["MXBlockA"]:
+        module.add(self.calculateStagger(kernel, tensorParametersA["MX"]))
       if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
         module.add(self.calculateStagger(kernel,tPM))
+      if kernel["ProblemType"]["MXBlockB"]:
+        module.add(self.calculateStagger(kernel, tensorParametersB["MX"]))
       module.add(self.calculateStagger(kernel, tensorParametersB))
 
     # LRO and LWA as assigned
