@@ -1655,20 +1655,32 @@ class KernelWriterAssembly(KernelWriter):
     # final offsets
     module.addComment1("local read addresses: final offsets a")
     module.add(self.lraFinalOffset(kernel, tPA))
+    if kernel["ProblemType"]["MXBlockA"]:
+      module.addComment1("local read addresses: final offsets mxsa")
+      module.add(self.lraFinalOffset(kernel, tPA["MX"]))
     if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
       module.addComment1("local read addresses: final offsets metadata")
       module.add(self.lraFinalOffset(kernel, tPM))
     module.addComment1("local read addresses: final offsets b")
     module.add(self.lraFinalOffset(kernel, tPB))
+    if kernel["ProblemType"]["MXBlockB"]:
+      module.addComment1("local read addresses: final offsets mxsb")
+      module.add(self.lraFinalOffset(kernel, tPB["MX"]))
 
     # declare addresses
     module.addComment1("local read addresses: declare addresses a")
     module.add(self.lraDeclareAddresses(kernel, tPA))
+    if kernel["ProblemType"]["MXBlockA"]:
+      module.addComment1("local read addresses: declare addresses mxsa")
+      module.add(self.lraDeclareAddresses(kernel, tPA["MX"]))
     if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
       module.addComment1("local read addresses: declare addresses metadata")
       module.add(self.lraDeclareAddresses(kernel, tPM))
     module.addComment1("local read addresses: declare addresses b")
     module.add(self.lraDeclareAddresses(kernel, tPB))
+    if kernel["ProblemType"]["MXBlockB"]:
+      module.addComment1("local read addresses: declare addresses mxsb")
+      module.add(self.lraDeclareAddresses(kernel, tPB["MX"]))
 
     if self.states.a.numVgprLocalReadAddr > 0:
       module.add(self.lraSwapAddressesForDTLPad(kernel, tPA))
@@ -4207,18 +4219,27 @@ class KernelWriterAssembly(KernelWriter):
 
     component = Component.LraTileAssignment.find(self)
 
-    tP0 = tPA if tPB["tile01Idx"] else tPB
-    tP1 = tPB if tPB["tile01Idx"] else tPA
+    tPMXSA = tPA["MX"] if kernel["ProblemType"]["MXBlockA"] else None
+    tPMXSB = tPB["MX"] if kernel["ProblemType"]["MXBlockB"] else None
+
+    tP0    = tPA    if tPB["tile01Idx"] else tPB
+    tPMXS0 = tPMXSA if tPB["tile01Idx"] else tPMXSB
+    tP1    = tPB    if tPB["tile01Idx"] else tPA
+    tPMXS1 = tPMXSB if tPB["tile01Idx"] else tPMXSA
 
     if component:
       # do not generate local read code if DirectToVgpr is enabled
       tc = tP0["tensorChar"]
       if not kernel["DirectToVgpr%s"%tc]:
         module.add(component(self, kernel, tP0))
+        if tPMXS0:
+          module.add(component(self, kernel, tPMXS0))
       # do not generate local read code if DirectToVgpr is enabled
       tc = tP1["tensorChar"]
       if not kernel["DirectToVgpr%s"%tc]:
         module.add(component(self, kernel, tP1))
+        if tPMXS1:
+          module.add(component(self, kernel, tPMXS1))
       if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
         tPM = tPA["tpsMetadata"] if tPA["is_sparse"] else tPB["tpsMetadata"]
         module.add(component(self, kernel, tPM))
@@ -4233,7 +4254,7 @@ class KernelWriterAssembly(KernelWriter):
 
     tc = tP["tensorChar"]
     # do not generate local read code if DirectToVgpr is enabled
-    if (tP["isA"] or tP["isB"]) and kernel["DirectToVgpr%s"%tc]:
+    if (tc in ("A", "MXSA", "B", "MXSB")) and kernel["DirectToVgpr%s"%tc]:
       return Module("lraFinalOffset (Empty)")
 
     if kernel["EnableMatrixInstruction"]:
@@ -4250,7 +4271,7 @@ class KernelWriterAssembly(KernelWriter):
       mtAddPad    = kernel["MacroTile%u" % tile01] + LdsPad
       umlds       = kernel["UnrollMajorLDS%s" % tc]
       lsu         = kernel["LocalSplitU"]
-      du          = kernel["DepthU"]
+      du          = kernel["_DepthU%s"%tc]
       lsuStride   = du // lsu
       numWaves = kernel["MIWaveGroup"][0] * kernel["MIWaveGroup"][1]
 
@@ -4404,7 +4425,10 @@ class KernelWriterAssembly(KernelWriter):
 
     else:
       # no need to generate add code if LdsOffset is 0 or DirectToVgprB
-      if kernel["LdsOffset%s"%tP["tensorChar"]] == 0 or tP["isB"] and kernel["DirectToVgprB"]:
+      if kernel["LdsOffset%s"%tP["tensorChar"]] == 0 \
+          or (tP["isMXSA"] and kernel["DirectToVgprMXSA"]) \
+          or (tP["isB"] and kernel["DirectToVgprB"]) \
+          or (tP["isMXSB"] and kernel["DirectToVgprMXSB"]):
         module = Module("lraDeclareAddresses (Empty)")
       else:
         module.add(VAddCOU32(
@@ -10117,53 +10141,37 @@ class KernelWriterAssembly(KernelWriter):
             if tc == "A":
               sparseA = kernel["ProblemType"]["Sparse"] == 1
               lrvw = kernel["LocalReadVectorWidth"] // (2 if sparseA else 1)
-              wlr = lrvw//kernel["MIInputPerThreadA"]
-              wlr = 1 if wlr == 0 else wlr
-              if kernel["ProblemType"]["Sparse"] and lrvw < kernel["MIInputPerThreadA"]:
-                if not sparseA:
-                  offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * (kernel["MatrixInstK"])
-                else:
-                  offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * (kernel["MatrixInstK"]*lrvw//kernel["MIInputPerThreadA"])
-              elif (self.states.localReadDoCntA)%(wlr):
+              wlr = max(lrvw//kernel["MIInputPerThreadA"], 1)
+              if self.states.localReadDoCntA % wlr:
                 offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * kernel["MIInputPerThreadA"]
               else:
-                isTF32EmuGfx950 = kernel["UseF32XEmulation"] and  (kernel["MatrixInstK"] >= 32 or (kernel["MatrixInstM"] == 32 and kernel["MatrixInstK"] == 16))
-                if kernel["UnrollMajorLDSA"] == False and kernel["MatrixInstK"] >= 64 or isTF32EmuGfx950: # Special handling for new f8 mfmas and tf32
-                  offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * (kernel["MatrixInstK"])
-                else:
-                  offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * (kernel["MatrixInstK"]*lrvw//kernel["MIInputPerThreadA"]-kernel["MIInputPerThreadA"]*(lrvw//kernel["MIInputPerThreadA"]-1))
+                # TODO: There is Special handling for new f8 mfmas and tf32 below, need to verify if still needed
+                # isTF32EmuGfx950 = kernel["UseF32XEmulation"] and  (kernel["MatrixInstK"] >= 32 or (kernel["MatrixInstM"] == 32 and kernel["MatrixInstK"] == 16))
+                # if kernel["UnrollMajorLDSA"] == False and kernel["MatrixInstK"] >= 64 or isTF32EmuGfx950: # Special handling for new f8 mfmas and tf32
+                #   offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * (kernel["MatrixInstK"])
+                # else:
+                #   offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * (kernel["MatrixInstK"]*lrvw//kernel["MIInputPerThreadA"]-kernel["MIInputPerThreadA"]*(lrvw//kernel["MIInputPerThreadA"]-1))
+                offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * ((kernel["MatrixInstK"] * wlr) - (kernel["MIInputPerThreadA"] * (wlr - 1)))
+
                 if sparseA:
                   offsetInc //= 2
             elif tc == "Metadata":
               lrvw = kernel["LocalReadVectorWidth"] // 8
-              if lrvw < kernel["MIInputPerThreadMetadata"]:
-                offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * (kernel["MatrixInstK"]*lrvw//kernel["MIInputPerThreadMetadata"]) // 4
-              elif (self.states.localReadDoCntMetadata)%(lrvw//kernel["MIInputPerThreadMetadata"]):
+              wlr = max(lrvw//kernel["MIInputPerThreadMetadata"], 1)
+              if self.states.localReadDoCntMetadata % wlr:
                 offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * kernel["MIInputPerThreadMetadata"]
               else:
-                offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * (kernel["MatrixInstK"]*lrvw//kernel["MIInputPerThreadMetadata"]-kernel["MIInputPerThreadMetadata"]*(lrvw//kernel["MIInputPerThreadMetadata"]-1))
+                offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * (kernel["MatrixInstK"] * wlr - (kernel["MIInputPerThreadMetadata"] * (wlr - 1)))
                 offsetInc //= 8
             else:
               sparseB = kernel["ProblemType"]["Sparse"] == 2
               lrvw = kernel["LocalReadVectorWidth"] // (2 if sparseB else 1)
-              wlr = lrvw//kernel["MIInputPerThreadB"]
-              wlr = 1 if wlr == 0 else wlr
-              #if (self.states.localReadDoCntB)%(lrvw//kernel["MIInputPerThreadB"]):
-              if kernel["ProblemType"]["Sparse"] and lrvw < kernel["MIInputPerThreadB"]:
-                if not sparseB:
-                  offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * (kernel["MatrixInstK"])
-                else:
-                  offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * (kernel["MatrixInstK"]*lrvw//kernel["MIInputPerThreadB"])
-              elif (self.states.localReadDoCntB)%(wlr):
+              wlr = max(lrvw//kernel["MIInputPerThreadB"], 1)
+              if self.states.localReadDoCntB % wlr:
                 offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * kernel["MIInputPerThreadB"]
-
               else:
-                isTF32EmuGfx950 = kernel["UseF32XEmulation"] and  (kernel["MatrixInstK"] >= 32 or (kernel["MatrixInstM"] == 32 and kernel["MatrixInstK"] == 16))
-                if kernel["UnrollMajorLDSB"] == False and kernel["MatrixInstK"] >= 64 or isTF32EmuGfx950: # Special handling for new f8 mfmas and tf32
-                  offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * (kernel["MatrixInstK"])
-                else:
-                  offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * (kernel["MatrixInstK"]*lrvw//kernel["MIInputPerThreadB"]-kernel["MIInputPerThreadB"]*(lrvw//kernel["MIInputPerThreadB"]-1))
-
+                # TODO: There is Special handling for new f8 mfmas and tf32 below, need to verify if still needed
+                offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * (kernel["MatrixInstK"] * wlr - (kernel["MIInputPerThreadB"] * (wlr - 1)))
                 if sparseB:
                   offsetInc //= 2
         else:
