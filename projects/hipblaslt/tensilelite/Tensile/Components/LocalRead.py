@@ -213,10 +213,16 @@ class LocalReadMFMA(LocalRead):
         tc = tP["tensorChar"]
         if tc == "A":
             writer.states.localReadDoCntA += 1
+        elif tc == "MXSA":
+            writer.states.localReadDoCntMXSA += 1
         elif tc == "Metadata":
             writer.states.localReadDoCntMetadata += 1
-        else:
+        elif tc == "B":
             writer.states.localReadDoCntB += 1
+        elif tc == "MXSB":
+            writer.states.localReadDoCntMXSB += 1
+        else:
+            raise Exception(f"unsupport tc %s{tc}")
         tile01           = tP["tile01Idx"]
         instruction      = tP["localReadInstruction"]
         bpr              = 4 # bytes/register
@@ -250,12 +256,16 @@ class LocalReadMFMA(LocalRead):
         tmpvgprFP32 = []
         if tc == 'A':
             lrvwTile = writer.states.lrvwTileA
+        elif tc == "MXSA":
+            lrvwTile = writer.states.lrvwTileMXSA
         elif tc == 'B':
             lrvwTile = writer.states.lrvwTileB
+        elif tc == "MXSB":
+            lrvwTile = writer.states.lrvwTileMXSB
         elif tc == "Metadata":
             lrvwTile = writer.states.lrvwTileMetadata
         else:
-            lrvwTile = 1
+            raise Exception(f"unsupport tc %s{tc}")
         numElementPerRead = 1 if kernel["ConvertAfterDS"] and not kernel["UseF32XEmulation"] else int((blockWidth * bpr) // tP['bpe'] // lrvwTile)
         inputPerThread   = kernel["LocalReadVectorWidth"] if not writer.states.inTailLoop else kernel["MIInputPerThread%s"%tc]
 
@@ -270,6 +280,9 @@ class LocalReadMFMA(LocalRead):
             needPack |= needPackMetadata
         else:
             needPack = blockWidth == 0.25
+        if tc in ("MXSA", "MXSB"):
+            # TODO: fix hard code
+            needPack = False
         needPack |= (kernel["ConvertAfterDS"] and (tP["bpe"] != tP["bpeDS"]))
         needPack |= kernel["UseF32XEmulation"]
         pack     = Module("pack%s_I%s"%(tc,iui))
@@ -785,7 +798,7 @@ class LocalReadMFMA(LocalRead):
                         if kernel["ConvertAfterDS"] and kernel["UnrollMajorLDS%s"%tc]:
                             valufIdx += blockWidth * (tP["bpe"] // tP["bpeDS"]) if (not tP["isM"]) else 1
                         else:
-                            valufIdx += blockWidth if (not tP["isM"]) else 1
+                            valufIdx += blockWidth if (tc in ("A", "B")) else 1
 
                         # load read instrution
                         paramList = []

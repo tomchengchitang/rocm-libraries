@@ -479,7 +479,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # Only works if the problem uses full tiles (no edges)
     # Mismatches will assert (generate GPUVM fault)
     self.db["CheckValue1A"] = self.debugConfig.enableDebugA
+    self.db["CheckValue1MXSA"] = False
     self.db["CheckValue1B"] = self.debugConfig.enableDebugB
+    self.db["CheckValue1MXSB"] = False
     self.db["CheckValue1Metadata"] = False
     # Check value in C matrix.
     # Caveats:
@@ -3180,6 +3182,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
                 # CMS only needs 1st PLRPack code insertion in preLoop
                 if iui == 0 or not usePLRPackCMS:
                   pack[plrIdx].add(packCodeA)
+              if kernel["ProblemType"]["MXBlockA"]:
+                if iui*self.states.numReadsIterCoalescedMXSA < kernel["InnerUnroll"]:
+                  module.addComment1("local read prefetch mxsa")
+                  localReadCodeMXSA, packCodeMXSA = self.localReadDo(kernel, plrIdx*self.states.numIterPerCoalescedReadMXSA, iui*self.states.numReadsIterCoalescedMXSA, espi, tensorParametersA["MX"])
+                  module.add(localReadCodeMXSA)
+                  pack[plrIdx].add(packCodeMXSA)
               if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
                 if iui*self.states.numReadsIterCoalescedMetadata < kernel["InnerUnroll"]:
                   module.addComment1("local read prefetch metadata")
@@ -3192,6 +3200,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
                 module.add(localReadCodeB)
                 if iui == 0 or not usePLRPackCMS:  
                   pack[plrIdx].add(packCodeB)
+              if kernel["ProblemType"]["MXBlockB"]:
+                if iui*self.states.numReadsIterCoalescedMXSB < kernel["InnerUnroll"]:
+                  module.addComment1("local read prefetch mxsb")
+                  localReadCodeMXSB, packCodeMXSB = self.localReadDo(kernel, plrIdx*self.states.numIterPerCoalescedReadMXSB, iui*self.states.numReadsIterCoalescedMXSB, espi, tensorParametersB["MX"])
+                  module.add(localReadCodeMXSB)
+                  pack[plrIdx].add(packCodeMXSB)
               if not kernel["ForceUnrollSubIter"] and (iui*self.states.numReadsIterCoalescedA < kernel["InnerUnroll"]):
                 module.addComment1("local read inc a")
                 module.add(self.localReadInc(kernel, iui, tensorParametersA))
