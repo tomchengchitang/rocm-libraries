@@ -9110,6 +9110,9 @@ class KernelWriterAssembly(KernelWriter):
       if internalPointerSwap and not kernel["StoreSwapAddr"]:
         tP["localWriteSwapByteOffset"] = 0 if tP["localWriteSwapByteOffset"] else kernel["LdsOffsetA_Blk"]
         module.addComment1("(EPS=1) local write swap internal offset -> %u" % tP["localWriteSwapByteOffset"])
+        if "MX" in tP:
+          tP["MX"]["localWriteSwapByteOffset"] = 0 if tP["MX"]["localWriteSwapByteOffset"] else kernel["LdsOffsetA_Blk"]
+          module.addComment1("(EPS=1) local write swap internal offset -> %u" % tP["MX"]["localWriteSwapByteOffset"])
       else:
         src0Val = None
         if kernel["StoreSwapAddr"]:
@@ -9122,6 +9125,11 @@ class KernelWriterAssembly(KernelWriter):
           src0Val = hex(kernel["LdsOffsetA_Blk"])
         numLwa = self.states.a.numVgprLocalWriteAddr if tP["isA"] else self.states.b.numVgprLocalWriteAddr
         localWriteSwapXOR(tc, src0Val, numLwa)
+
+        if "MX" in tP:
+          tc = tP["MX"]["tensorChar"]
+          numLwa = self.states.mxsa.numVgprLocalWriteAddr if tP["isA"] else self.states.mxsb.numVgprLocalWriteAddr
+          localWriteSwapXOR(tc, src0Val, numLwa)
 
     # This used to control where to store the metadata
     if needMetaSwap:
@@ -9539,8 +9547,22 @@ class KernelWriterAssembly(KernelWriter):
 
       tmpLocalWriteAddr = -1
 
+      isAB = tc in ('A', 'B')
+
+      numVgprG2L = 0
+      if tc == 'A':
+        numVgprG2L = self.states.a.numVgprG2L
+      elif tc == 'MXSA':
+        numVgprG2L = self.states.mxsa.numVgprG2L
+      elif tc == 'B':
+        numVgprG2L = self.states.b.numVgprG2L
+      elif tc == 'MXSB':
+        numVgprG2L = self.states.mxsb.numVgprG2L
+      else:
+        numVgprG2L = self.states.m.numVgprG2L
+
       # using _ds_store_b8: need one more vgpr space to do lshr
-      tmpVgprOffset = ((self.states.a.numVgprG2L if (tP['tensorChar'] == 'A') else self.states.m.numVgprG2L if tP["isM"] else self.states.b.numVgprG2L) / 2) if (blockWidth == 0.25) else 0
+      tmpVgprOffset = (numVgprG2L / 2) if (blockWidth == 0.25) else 0
 
       # if transposing, positions of sPerp and sPara are transposed
       instructionCnt = 0
@@ -9610,10 +9632,9 @@ class KernelWriterAssembly(KernelWriter):
             instHi = g2lIdxDict[g2lIdx]
 
             if self.states.archCaps["HasEccHalf"] or not self.states.asmCaps["HasWMMA_V1"]:
-              numVgprG2L = self.states.a.numVgprG2L if tc == 'A' else self.states.b.numVgprG2L if tc == 'B' else self.states.m.numVgprG2L
               eccinstHi = instHi
               # FIXME: Workaround, unique pattern in 8bit + glvw == 2...
-              if tP["bpeDS"] == tP["bpeGR"] and (tP["globalReadInstruction"].totalWidth) == 0.5 and (blockWidth == 0.25) and not tP["isM"]:
+              if tP["bpeDS"] == tP["bpeGR"] and (tP["globalReadInstruction"].totalWidth) == 0.5 and (blockWidth == 0.25) and isAB:
                 eccinstHi = i // 2
               eccBpe = tP["bpeDS"] if kernel["ConvertAfterDS"] else max(tP["bpeGR"], tP["bpe"])
               eccOffset = _getEccOffset(tP["globalReadInstruction"].totalWidth, bpr=self.states.bpr, bpe=eccBpe, \
@@ -9622,7 +9643,7 @@ class KernelWriterAssembly(KernelWriter):
               eccOffset = 0
 
             # TODO- INT8: check uDu
-            if (blockWidth == 0.25) and ((s % 4) == 0) and (not tP["isM"] or needToSplitMetadata):
+            if (blockWidth == 0.25) and ((s % 4) == 0) and (isAB or needToSplitMetadata):
                 src = destVgprPrefix + "+%u" % (g2lIdx + eccOffset)
                 dst = destVgprPrefix + "+%u+%u" % (tmpVgprOffset, g2lIdx)
                 if tP["bpeDS"] != tP["bpeGR"]:
@@ -9645,7 +9666,7 @@ class KernelWriterAssembly(KernelWriter):
             isHigh16Bits = False
             isCvtHighBits = False
             datatype = kernel["ProblemType"]["DataType%s"%tc] if kernel["ConvertAfterDS"] else kernel["ProblemType"]["DataType"]
-            if (datatype.isHalf() or datatype.isBFloat16()) and not tP["isM"]:
+            if (datatype.isHalf() or datatype.isBFloat16()) and isAB:
               if s%2==1:
                 isHigh16Bits = True
               if (blockWidth == 0.5) and (instHi % 2 == 1):
@@ -9658,7 +9679,7 @@ class KernelWriterAssembly(KernelWriter):
             #############################################
             # VGPR: |---w4---|---w3---|---w2---|---w1---| -> b8_d16: get w1 / _b8_d16_hi: get w3
             # LSHR: |--------|---w4---|--------|---w2---| -> b8_d16: get w2 / _b8_d16_hi: get w4
-            elif datatype.isInt8() or datatype.is8bitFloat() or tP["isM"]:
+            elif datatype.isInt8() or datatype.is8bitFloat() or (not isAB):
               isHigh16Bits = (s % 4) > 1 # 2,3
               # TODO
               # if tP["glvw"]==1 and instructionCnt%2==1:
@@ -9702,7 +9723,7 @@ class KernelWriterAssembly(KernelWriter):
                 numsOfRegister.append(blockWidth)
               if self.db["ForceInputValue%s"%tc]:
                 localWriteCVTCode.add(VMovB32(dst=vgpr(destVgprPrefix + "+%u"%(g2lIdx)), src=self.db["ForceValue%s"], comment="ForceInputValue"))
-              if (kernel["ProblemType"]["DataType"].isBFloat16() and kernel["ProblemType"]["DataType%s"%tc].isHalf()) and not tP["isM"]:
+              if (kernel["ProblemType"]["DataType"].isBFloat16() and kernel["ProblemType"]["DataType%s"%tc].isHalf()) and isAB:
                 numIters = 1 if blockWidth <= 1 else blockWidth
                 vgprTmp = self.vgprPool.checkOut(2)
                 for iter in range(0, numIters):
@@ -10037,6 +10058,8 @@ class KernelWriterAssembly(KernelWriter):
       # Skip local write if DTVA or DTVB
       if not ((tP["isA"] or tP["isB"]) and kernel["DirectToVgpr%s"%tc]):
         localWriteBody(tP)
+        if "MX" in tP:
+          localWriteBody(tP["MX"])
       if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
         if tP["is_sparse"]:
           localWriteBody(tP["tpsMetadata"])
