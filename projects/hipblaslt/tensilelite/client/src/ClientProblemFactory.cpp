@@ -129,8 +129,8 @@ namespace TensileLite
                 }
             }
             
-            m_tensorTypes[ContractionProblemGemm::TENSOR::MXSA] = DataType::MXScale;
-            m_tensorTypes[ContractionProblemGemm::TENSOR::MXSB] = DataType::MXScale;
+            m_tensorTypes[ContractionProblemGemm::TENSOR::MXSA] = rocisa::DataType::MXScale;
+            m_tensorTypes[ContractionProblemGemm::TENSOR::MXSB] = rocisa::DataType::MXScale;
 // Get constant types
             for(size_t i = 0; i < constants.size(); i++)
             {

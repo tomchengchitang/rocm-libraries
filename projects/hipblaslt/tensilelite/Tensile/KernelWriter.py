@@ -340,8 +340,6 @@ class StateValues:
     self.preloadGuard = []
     self.tmpvgpr = {}
     self.freeSgprVarPool = set()
-    self.vwmxsa = self.kernel.get("VectorWidthMXSA", 0)
-    self.vwmxsb = self.kernel.get("VectorWidthMXSB", 0)
     self.lrvwUnrollMXSA = 1
     self.lrvwUnrollMXSB = 1
 
@@ -885,7 +883,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         if localReadCodeA.itemsSize():
           localReadCodeAB.addItems(localReadCodeA.popFirstNItems(localReadCodeA.itemsSize()))
         if localReadCodeMXSA.itemsSize():
-          localReadCodeAB.add(localReadCodeMXSA.popFirstNItems(localReadCodeMXSA.itemsSize()))
+          localReadCodeAB.addItems(localReadCodeMXSA.popFirstNItems(localReadCodeMXSA.itemsSize()))
         if localReadCodeM.itemsSize():
           localReadCodeAB.addItems(localReadCodeM.popFirstNItems(localReadCodeM.itemsSize()))
         if localReadCodeMXSB.itemsSize():
@@ -4109,7 +4107,11 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     # TODO load sub-vector
     vwa = kernel["GlobalReadVectorWidthA"]
+    if kernel["ProblemType"]["MXBlockA"]:
+      vwmxsa = kernel["GlobalReadVectorWidthMXSA"]
     vwb = kernel["GlobalReadVectorWidthB"]
+    if kernel["ProblemType"]["MXBlockB"]:
+      vwmxsb = kernel["GlobalReadVectorWidthMXSB"]
     if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
       vwm = kernel["GlobalReadVectorWidthMetadata"]
 
@@ -4695,7 +4697,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         self.states.mxsa.numVgprG2L = roundUp((kernel["NumLoadsCoalescedMXSA"] * kernel["NumLoadsPerpendicularMXSA"] * \
           kernel["GlobalReadVectorWidthMXSA"]) / (float)(self.states.bpr))
         if self.states.archCaps["HasEccHalf"] or not self.states.asmCaps["HasWMMA_V1"]:
-          tpMXSA = self.states.bpr if self.states.vwmxsa < self.states.bpr else self.states.vwmxsa
+          tpMXSA = self.states.bpr if vwmxsa < self.states.bpr else vwmxsa
           self.states.mxsa.numVgprG2LAllocated = roundUp((kernel["NumLoadsCoalescedMXSA"] * kernel["NumLoadsPerpendicularMXSA"] * \
             tpMXSA) / (float)(self.states.bpr))
         else:
@@ -4756,7 +4758,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         self.states.mxsb.numVgprG2L = roundUp((kernel["NumLoadsCoalescedMXSB"] * kernel["NumLoadsPerpendicularMXSB"] * \
           kernel["GlobalReadVectorWidthMXSB"]) / (float)(self.states.bpr))
         if self.states.archCaps["HasEccHalf"] or not self.states.asmCaps["HasWMMA_V1"]:
-          tpMXSB = self.states.bpr if self.states.vwmxsb < self.states.bpr else self.states.vwmxsb
+          tpMXSB = self.states.bpr if vwmxsb < self.states.bpr else vwmxsb
           self.states.mxsb.numVgprG2LAllocated = roundUp((kernel["NumLoadsCoalescedMXSB"] * kernel["NumLoadsPerpendicularMXSB"] * \
             tpMXSB) / (float)(self.states.bpr))
         else:

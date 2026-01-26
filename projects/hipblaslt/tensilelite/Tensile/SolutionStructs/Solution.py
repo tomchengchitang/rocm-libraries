@@ -1082,8 +1082,8 @@ class Solution(collections.abc.Mapping):
               or state["ProblemType"]["DataType"].isHalf() \
               or state["ProblemType"]["DataType"].isComplex() \
               or state["ProblemType"]["DataType"].is8bitFloat() \
-              or state["ProblemType"]["DataType"].isInt8()) \
-              or state["ProblemType"]["DataType"].isFloat4():
+              or state["ProblemType"]["DataType"].isInt8() \
+              or state["ProblemType"]["DataType"].isFloat4()):
         reject(state, printRejectionReason, "didn't support Matrix Instruction with type %s" % str(state["ProblemType"]["DataType"]))
         return
       if (not isaInfoMap[isa].asmCaps["HasMFMA"] and isaInfoMap[isa].asmCaps["HasWMMA"] and (state["WavefrontSize"] == 64)):
@@ -1440,7 +1440,7 @@ class Solution(collections.abc.Mapping):
         state["MacroTileMXSA"] = state["MacroTileA"]
         state["WaveSeparateGlobalReadMXSA"] = state["WaveSeparateGlobalReadA"]
         state["NumLoadsCoalescedMXSA"] = state["NumLoadsCoalescedA"]
-        Solution.checkAndAssignWaveSeparateGlobalRead(state, 'MXSA')
+        Solution.checkAndAssignWaveSeparateGlobalRead(state, 'MXSA', printRejectionReason)
         state["DirectToLdsMXSA"] = False
         state["LocalWriteUseSgprMXSA"] = False
         state["ProblemType"]["MirrorDimsMXSA"] = list(state["ProblemType"]["MirrorDimsA"])
@@ -1455,7 +1455,7 @@ class Solution(collections.abc.Mapping):
         state["MacroTileMXSB"] = state["MacroTileB"]
         state["WaveSeparateGlobalReadMXSB"] = state["WaveSeparateGlobalReadB"]
         state["NumLoadsCoalescedMXSB"] = state["NumLoadsCoalescedB"]
-        Solution.checkAndAssignWaveSeparateGlobalRead(state, 'MXSB')
+        Solution.checkAndAssignWaveSeparateGlobalRead(state, 'MXSB', printRejectionReason)
         state["DirectToLdsMXSB"] = False
         state["LocalWriteUseSgprMXSB"] = False
         state["ProblemType"]["MirrorDimsMXSB"]  = list(state["ProblemType"]["MirrorDimsB"])
@@ -2173,7 +2173,7 @@ class Solution(collections.abc.Mapping):
 
         # handle global read vector width MXSA
         if state["ProblemType"]["MXBlockA"]:
-          if state["TLUMXSA"]:
+          if state["ProblemType"]["TLUA"]: # NT/NN
             totalElementsCoalescedMXSA = state["MacroTileMXSA"]
             totalElementsPerpMXSA = state["_DepthUMXSA"]
             if state["DirectToVgprMXSA"]:
@@ -2192,7 +2192,7 @@ class Solution(collections.abc.Mapping):
 
         # handle global read vector width MXSB
         if state["ProblemType"]["MXBlockB"]:
-          if state["TLUMXSB"]:
+          if state["ProblemType"]["TLUB"]: # NT/NN
             totalElementsCoalescedMXSB = state["MacroTileMXSB"]
             totalElementsPerpMXSB = state["_DepthUMXSB"]
             if state["DirectToVgprMXSB"]:
@@ -2581,7 +2581,7 @@ class Solution(collections.abc.Mapping):
 
     if state["ProblemType"]["MXBlockA"]:
       if not Solution.setGlobalLoadTileDimClassic(state, "MXSA", state["NumLoadsMXSA"], \
-          totalVectorsCoalescedMXSA, totalElementsPerpMXSA, state["_DepthUMXSA"]):
+          totalVectorsCoalescedMXSA, totalElementsPerpMXSA, state["_DepthUMXSA"], printRejectionReason):
         return
 
     if not Solution.setGlobalLoadTileDimClassic(state, "B", state["NumLoadsB"], \
@@ -2590,7 +2590,7 @@ class Solution(collections.abc.Mapping):
       
     if state["ProblemType"]["MXBlockB"]:
       if not Solution.setGlobalLoadTileDimClassic(state, "MXSB", state["NumLoadsMXSB"], \
-          totalVectorsCoalescedMXSB, totalElementsPerpMXSB, state["_DepthUMXSB"]):
+          totalVectorsCoalescedMXSB, totalElementsPerpMXSB, state["_DepthUMXSB"], printRejectionReason):
         return
 
     if state["ProblemType"]["Sparse"] and not state["DirectToVgprSparseMetadata"]:

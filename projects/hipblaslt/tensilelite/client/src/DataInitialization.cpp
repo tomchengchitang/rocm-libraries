@@ -1189,7 +1189,6 @@ namespace TensileLite
                         continue;
                     }
 
-                    size_t dataTypeSize = DataTypeInfo::Get(p->first).elementSize;
                     if(m_curBoundsCheck == BoundsCheckMode::NaN)
                     {
                         p->second.maxElements += 1024;
@@ -1197,9 +1196,8 @@ namespace TensileLite
                     else if(m_curBoundsCheck == BoundsCheckMode::GuardPageFront
                             || m_curBoundsCheck == BoundsCheckMode::GuardPageBack)
                     {
-                        size_t roundUpSize = pageSize / dataTypeSize;
-                        p->second.maxElements
-                            = RoundUpToMultiple<size_t>(p->second.maxElements, roundUpSize);
+                        float dataTypeSize = DataTypeInfo::Get(p->first).elementSize;
+                        unsigned int roundUpSize = divideElementSize(pageSize, dataTypeSize);
                         // No bias page guard
                     }
                     ++p;
@@ -1305,7 +1303,7 @@ namespace TensileLite
                 for(auto& p : it.pristine)
                 {
                     auto&  pUnit = p.second;
-                    size_t size  = multiplyElementSize(pUnit, DataTypeInfo::Get(...)).maxElements;
+                    size_t size  = multiplyElementSize(pUnit.maxElements, DataTypeInfo::Get(p.first).elementSize);
                     if(size <= 0)
                     {
                         throw std::runtime_error("Size not exists.");
@@ -1377,7 +1375,7 @@ namespace TensileLite
                 for(auto& p : it.pristine)
                 {
                     auto&  pUnit = p.second;
-                    size_t size  = multiplyElementSize(pUnit, DataTypeInfo::Get(...)).maxElements;
+                    size_t size  = multiplyElementSize(pUnit.maxElements, DataTypeInfo::Get(p.first).elementSize);
 
                     std::stringstream ss;
                     ss << "[" << tensorIdx << "]" << "Failed to allocate gpu input " << it.name
@@ -2251,44 +2249,38 @@ namespace TensileLite
                 if(u8Ptr[ContractionProblemGemm::TENSOR::SCALEA] != nullptr)
                 {
                     u8Ptr[ContractionProblemGemm::TENSOR::SCALEA]
-                        += offsets[ContractionProblemGemm::TENSOR::SCALEA][idx]
-                           * problem.tensors()[ContractionProblemGemm::TENSOR::SCALEA]
-                                 .elementBytes();
+                        += multiplyElementSize(offsets[ContractionProblemGemm::TENSOR::SCALEA][idx],
+                                               problem.tensors()[ContractionProblemGemm::TENSOR::SCALEA].elementBytes());
                 }
                 if(u8Ptr[ContractionProblemGemm::TENSOR::SCALEB] != nullptr)
                 {
                     u8Ptr[ContractionProblemGemm::TENSOR::SCALEB]
-                        += offsets[ContractionProblemGemm::TENSOR::SCALEB][idx]
-                           * problem.tensors()[ContractionProblemGemm::TENSOR::SCALEB]
-                                 .elementBytes();
+                        += multiplyElementSize(offsets[ContractionProblemGemm::TENSOR::SCALEB][idx],
+                                               problem.tensors()[ContractionProblemGemm::TENSOR::SCALEB].elementBytes());
                 }
                 if(u8Ptr[ContractionProblemGemm::TENSOR::SCALEC] != nullptr)
                 {
                     u8Ptr[ContractionProblemGemm::TENSOR::SCALEC]
-                        += offsets[ContractionProblemGemm::TENSOR::SCALEC][idx]
-                           * problem.tensors()[ContractionProblemGemm::TENSOR::SCALEC]
-                                 .elementBytes();
+                        += multiplyElementSize(offsets[ContractionProblemGemm::TENSOR::SCALEC][idx],
+                                               problem.tensors()[ContractionProblemGemm::TENSOR::SCALEC].elementBytes());
                 }
                 if(u8Ptr[ContractionProblemGemm::TENSOR::SCALED] != nullptr)
                 {
                     u8Ptr[ContractionProblemGemm::TENSOR::SCALED]
-                        += offsets[ContractionProblemGemm::TENSOR::SCALED][idx]
-                           * problem.tensors()[ContractionProblemGemm::TENSOR::SCALED]
-                                 .elementBytes();
+                        += multiplyElementSize(offsets[ContractionProblemGemm::TENSOR::SCALED][idx],
+                                               problem.tensors()[ContractionProblemGemm::TENSOR::SCALED].elementBytes());
                 }
                 if(u8Ptr[ContractionProblemGemm::TENSOR::SCALEALPHAVEC] != nullptr)
                 {
                     u8Ptr[ContractionProblemGemm::TENSOR::SCALEALPHAVEC]
-                        += offsets[ContractionProblemGemm::TENSOR::SCALEALPHAVEC][idx]
-                           * problem.tensors()[ContractionProblemGemm::TENSOR::SCALEALPHAVEC]
-                                 .elementBytes();
+                        += multiplyElementSize(offsets[ContractionProblemGemm::TENSOR::SCALEALPHAVEC][idx],
+                                               problem.tensors()[ContractionProblemGemm::TENSOR::SCALEALPHAVEC].elementBytes());
                 }
                 if(u8Ptr[ContractionProblemGemm::TENSOR::Synchronizer] != nullptr)
                 {
                     u8Ptr[ContractionProblemGemm::TENSOR::Synchronizer]
-                        += offsets[ContractionProblemGemm::TENSOR::Synchronizer][idx]
-                           * problem.tensors()[ContractionProblemGemm::TENSOR::Synchronizer]
-                                 .elementBytes();
+                        += multiplyElementSize(offsets[ContractionProblemGemm::TENSOR::Synchronizer][idx],
+                                               problem.tensors()[ContractionProblemGemm::TENSOR::Synchronizer].elementBytes());
                 }
             }
         }

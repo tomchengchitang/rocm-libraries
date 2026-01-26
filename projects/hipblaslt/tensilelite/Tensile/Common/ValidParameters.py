@@ -894,7 +894,9 @@ validParameters = { # we need to make sure this matches develop
     # generate TailLoop code in NoLoadLoop to take advantage of prefetch and wider globalLoad plus instruction scheduling
     # Need certain conditions to use TailloopInNll optimization
     # - NT transpose or AssertSummationElementMultiple * bpeGR is multiple of 4 (with BufferLoad + ShiftPtr)
-    "TailloopInNll": [False, True]
+    "TailloopInNll": [False, True],
+    "UseGeneralizedNLCOneMXSA": [False, True],
+    "UseGeneralizedNLCOneMXSB": [False, True]
 }
 
 newMIValidParameters = {
