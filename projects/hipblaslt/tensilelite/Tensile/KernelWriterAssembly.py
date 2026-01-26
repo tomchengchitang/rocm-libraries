@@ -7814,6 +7814,7 @@ class KernelWriterAssembly(KernelWriter):
           imod.add(SCSelectB32(dst=sgpr(incUpper), src0=sgpr("WrapU%s+1"%tc), src1=0,
                       comment="incUpper <- ?"))
           imod.add(self.incrementSrd(tP, sgpr(incLower), sgpr(incUpper)))
+
           if "MX" in tP:
             # TODO: DirectToVgpr
             tc = tP["MX"]["tensorChar"]
