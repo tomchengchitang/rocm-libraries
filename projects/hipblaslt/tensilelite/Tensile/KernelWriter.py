@@ -1834,7 +1834,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
         # how many localreads can skip is based on how many iterations we prefetch.
         localReadsA = 0 if kernel["DirectToVgprA"] else self.states.numReadsPerIterA * skipReadsIterA
         localReadsB = 0 if kernel["DirectToVgprB"] else self.states.numReadsPerIterB * skipReadsIterB
-        localReads += localReadsA + localReadsB
+        localReadsMXSA = 0 if ((not kernel["ProblemType"]["MXBlockA"]) or kernel["DirectToVgprMXSA"]) else self.states.numReadsPerIterMXSA * skipReadsIterA
+        localReadsMXSB = 0 if ((not kernel["ProblemType"]["MXBlockB"]) or kernel["DirectToVgprMXSB"]) else self.states.numReadsPerIterMXSB * skipReadsIterB
+        localReads += (localReadsA + localReadsB + localReadsMXSA + localReadsMXSB)
         # some of localReads is interleaved after waitcnt in SIA3
         if scheduleIterAlg== 3 and self.states.numItersPLR and\
           (iteration < numReadsIterA or iteration < numReadsIterB or numPrefetchIter) and\
